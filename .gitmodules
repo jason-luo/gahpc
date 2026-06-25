@@ -1,0 +1,3 @@
+[submodule "ahpc-rs"]
+	path = ahpc-rs
+	url = git@github.com:jason-luo/ahpc-rs.git
