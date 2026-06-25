@@ -1,0 +1,15 @@
+# Xcode build artifacts
+build/
+*.xcworkspace
+xcuserdata/
+DerivedData/
+
+# Rust build artifacts (managed by submodule)
+ahpc-rs/target/
+
+# macOS
+.DS_Store
+*~
+
+# Pi session records
+pi-session-*.html
