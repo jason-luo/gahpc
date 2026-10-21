@@ -156,7 +156,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        guard let config = ConfigModel.load(), config.autoStart else { return }
+        guard AppSettings.load().autoStart else { return }
+        guard let config = ConfigModel.load() else { return }
 
         // Starting can block while Rust parses the key and initializes its
         // runtime, so never do it on the main thread.

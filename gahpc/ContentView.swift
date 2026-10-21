@@ -18,11 +18,13 @@ private let supportedCiphers = [
 
 struct ContentView: View {
     @State private var config: ConfigModel
+    @State private var appSettings: AppSettings
     @State private var isRunning = false
     @State private var statusMessage = "空闲"
     @State private var showError = false
     @State private var errorMessage = ""
     @State private var isAuthKeyVisible = false
+    @State private var autosaveWorkItem: DispatchWorkItem?
 
     @ObservedObject private var notices = AppNotices.shared
 
@@ -30,6 +32,8 @@ struct ContentView: View {
     private let statusTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     init() {
+        let settings = AppSettings.load()
+        _appSettings = State(initialValue: settings)
         _config = State(initialValue: ConfigModel.load() ?? ConfigModel())
     }
 
@@ -52,14 +56,22 @@ struct ContentView: View {
             presentAutoStartErrorIfNeeded()
         }
         .onDisappear {
-            _ = saveConfig()
+            saveNow()
         }
         .onReceive(statusTimer) { _ in updateStatus() }
         .onChange(of: notices.autoStartError) { _ in
             presentAutoStartErrorIfNeeded()
         }
+        .onChange(of: config) { _ in
+            scheduleAutosave()
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willResignActiveNotification)) { _ in
-            _ = saveConfig()
+            saveNow()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
+            // `terminate` from the menu does not necessarily trigger
+            // onDisappear/willResignActive, so save the latest edits here.
+            saveNow()
         }
     }
 
@@ -207,11 +219,11 @@ struct ContentView: View {
                     .foregroundColor(.secondary)
             }
 
-            Toggle(isOn: $config.autoStart) {
+            Toggle(isOn: $appSettings.autoStart) {
                 Text("应用启动时自动运行")
             }
-            .onChange(of: config.autoStart) { _ in
-                _ = saveConfig(showErrors: true)
+            .onChange(of: appSettings.autoStart) { _ in
+                appSettings.save()
             }
         }
     }
@@ -265,6 +277,26 @@ struct ContentView: View {
             }
             return false
         }
+    }
+
+    private func scheduleAutosave() {
+        autosaveWorkItem?.cancel()
+        let work = DispatchWorkItem {
+            _ = saveConfig()
+        }
+        autosaveWorkItem = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8, execute: work)
+    }
+
+    private func cancelAutosave() {
+        autosaveWorkItem?.cancel()
+        autosaveWorkItem = nil
+    }
+
+    private func saveNow() {
+        cancelAutosave()
+        appSettings.save()
+        _ = saveConfig()
     }
 
     private func updateStatus() {

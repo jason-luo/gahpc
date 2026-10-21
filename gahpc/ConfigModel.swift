@@ -2,7 +2,7 @@ import Foundation
 import Security
 
 /// Swift-side configuration matching the Rust `Config` struct.
-struct ConfigModel: Codable {
+struct ConfigModel: Codable, Equatable {
     var proxyServerAddress: String = ""
     var proxyServerPort: UInt16 = 443
     var bindAddress: String = "127.0.0.1"
@@ -12,7 +12,8 @@ struct ConfigModel: Codable {
     var timeout: UInt64 = 240
     var workers: Int = 2
     var authKey: String = ""
-    var autoStart: Bool = false
+
+    init() {}
 
     enum CodingKeys: String, CodingKey {
         case proxyServerAddress = "proxy_server_address"
@@ -24,7 +25,83 @@ struct ConfigModel: Codable {
         case timeout
         case workers
         case authKey = "auth_key"
+    }
+
+    /// Decode every field independently so adding a new setting later does not
+    /// make older saved configurations fail to load.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let defaults = ConfigModel()
+
+        proxyServerAddress = try container.decodeIfPresent(String.self, forKey: .proxyServerAddress)
+            ?? defaults.proxyServerAddress
+        proxyServerPort = try container.decodeIfPresent(UInt16.self, forKey: .proxyServerPort)
+            ?? defaults.proxyServerPort
+        bindAddress = try container.decodeIfPresent(String.self, forKey: .bindAddress)
+            ?? defaults.bindAddress
+        listenPort = try container.decodeIfPresent(UInt16.self, forKey: .listenPort)
+            ?? defaults.listenPort
+        rsaPublicKey = try container.decodeIfPresent(String.self, forKey: .rsaPublicKey)
+            ?? defaults.rsaPublicKey
+        cipher = try container.decodeIfPresent(String.self, forKey: .cipher)
+            ?? defaults.cipher
+        timeout = try container.decodeIfPresent(UInt64.self, forKey: .timeout)
+            ?? defaults.timeout
+        workers = try container.decodeIfPresent(Int.self, forKey: .workers)
+            ?? defaults.workers
+        authKey = try container.decodeIfPresent(String.self, forKey: .authKey)
+            ?? defaults.authKey
+    }
+}
+
+// MARK: - App settings
+
+/// UI-only preferences that must not be sent to the Rust proxy engine.
+struct AppSettings: Codable, Equatable {
+    var autoStart: Bool = false
+
+    init() {}
+
+    enum CodingKeys: String, CodingKey {
         case autoStart = "auto_start"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        autoStart = try container.decodeIfPresent(Bool.self, forKey: .autoStart) ?? false
+    }
+}
+
+extension AppSettings {
+    private static let storageKey = "app_settings"
+
+    static func load() -> AppSettings {
+        if let data = UserDefaults.standard.data(forKey: storageKey),
+           let settings = try? JSONDecoder().decode(AppSettings.self, from: data) {
+            return settings
+        }
+
+        // Migrate the old UI preference that lived inside the proxy config.
+        var settings = AppSettings()
+        if let legacyAutoStart = legacyAutoStart() {
+            settings.autoStart = legacyAutoStart
+            settings.save()
+        }
+        return settings
+    }
+
+    func save() {
+        guard let data = try? JSONEncoder().encode(self) else { return }
+        UserDefaults.standard.set(data, forKey: Self.storageKey)
+    }
+
+    private static func legacyAutoStart() -> Bool? {
+        guard let data = UserDefaults.standard.data(forKey: "proxy_config"),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else {
+            return nil
+        }
+        return object["auto_start"] as? Bool
     }
 }
 
@@ -32,8 +109,15 @@ struct ConfigModel: Codable {
 
 extension ConfigModel {
     private static let storageKey = "proxy_config"
+    private static let versionKey = "proxy_config_version"
+    // Version 2 moved the UI-only auto_start flag into AppSettings.
+    private static let currentVersion = 2
 
     static func load() -> ConfigModel? {
+        // Migrate the legacy UI-only auto_start flag before this method can
+        // rewrite proxy_config during the Auth Key migration.
+        _ = AppSettings.load()
+
         guard let data = UserDefaults.standard.data(forKey: storageKey) else { return nil }
         guard var config = try? JSONDecoder().decode(ConfigModel.self, from: data) else { return nil }
 
@@ -70,6 +154,10 @@ extension ConfigModel {
             config.authKey = ""
         }
 
+        if UserDefaults.standard.integer(forKey: versionKey) < currentVersion {
+            UserDefaults.standard.set(currentVersion, forKey: versionKey)
+        }
+
         return config
     }
 
@@ -82,6 +170,7 @@ extension ConfigModel {
         persisted.authKey = ""
         let data = try JSONEncoder().encode(persisted)
         UserDefaults.standard.set(data, forKey: Self.storageKey)
+        UserDefaults.standard.set(Self.currentVersion, forKey: Self.versionKey)
     }
 }
 
