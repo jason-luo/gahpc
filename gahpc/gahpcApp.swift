@@ -94,6 +94,7 @@ final class LoginItemController: ObservableObject {
                 message += "；请将 app 放到 /Applications 后重试"
             }
             errorMessage = message
+            AppLog.shared.error(message)
             // Refresh the flags but preserve the error message.
             refresh(clearError: false)
             return
@@ -102,7 +103,9 @@ final class LoginItemController: ObservableObject {
         refresh()
 
         if enabled, SMAppService.mainApp.status == .notFound {
-            errorMessage = "未找到登录项，请将 app 放到 /Applications 后重试"
+            let message = "未找到登录项，请将 app 放到 /Applications 后重试"
+            errorMessage = message
+            AppLog.shared.error(message)
         }
     }
 
@@ -166,6 +169,12 @@ struct gahpcApp: App {
                 .frame(minWidth: 500, minHeight: 400)
         }
         .windowResizability(.contentSize)
+
+        // 诊断日志窗口
+        Window("诊断日志", id: "logs") {
+            LogView()
+                .frame(minWidth: 600, minHeight: 400)
+        }
     }
 }
 
@@ -190,6 +199,18 @@ struct MenuContent: View {
 
         Divider()
 
+        if proxy.isRunning {
+            Button("停止代理") {
+                proxy.stop()
+            }
+            Divider()
+        } else if !proxy.isBusy {
+            Button("启动代理") {
+                startFromSavedConfig()
+            }
+            Divider()
+        }
+
         if proxy.lastError != nil {
             Button("代理操作失败，查看设置") {
                 openWindow(id: "settings")
@@ -204,22 +225,29 @@ struct MenuContent: View {
             NSApp.activate(ignoringOtherApps: true)
         }
 
+        Button("查看日志") {
+            openWindow(id: "logs")
+            NSApp.activate(ignoringOtherApps: true)
+        }
+
         // 2. 开机自启开关
         Toggle("登录时自动启动", isOn: loginItemBinding)
 
-        if let errorMessage = loginItem.errorMessage {
-            Text(errorMessage)
-                .font(.caption)
-                .foregroundColor(.red)
-        }
-
-        if loginItem.requiresApproval {
-            Button("需要在系统设置中批准登录项") {
-                loginItem.openSystemSettings()
+        Group {
+            if let errorMessage = loginItem.errorMessage {
+                Text(errorMessage)
+                    .font(.caption)
+                    .foregroundColor(.red)
             }
-        } else if loginItem.errorMessage != nil {
-            Button("打开登录项设置") {
-                loginItem.openSystemSettings()
+
+            if loginItem.requiresApproval {
+                Button("需要在系统设置中批准登录项") {
+                    loginItem.openSystemSettings()
+                }
+            } else if loginItem.errorMessage != nil {
+                Button("打开登录项设置") {
+                    loginItem.openSystemSettings()
+                }
             }
         }
 
@@ -236,5 +264,87 @@ struct MenuContent: View {
             get: { loginItem.isEnabled },
             set: { loginItem.setEnabled($0) }
         )
+    }
+
+    private func startFromSavedConfig() {
+        guard let loaded = ConfigModel.load() else {
+            proxy.report(error: "尚未保存代理配置，请先打开设置。")
+            return
+        }
+
+        let config = loaded.normalized()
+        if let error = config.validationError() {
+            proxy.report(error: error)
+            return
+        }
+
+        if config.isExposingToLAN {
+            proxy.report(error: "当前绑定地址可能允许局域网访问，请打开设置确认后启动。")
+            return
+        }
+
+        proxy.start(config: config)
+    }
+}
+
+// MARK: - Diagnostics
+
+struct LogView: View {
+    @ObservedObject private var log = AppLog.shared
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("诊断日志")
+                    .font(.headline)
+
+                Spacer()
+
+                Button("复制") {
+                    let pasteboard = NSPasteboard.general
+                    pasteboard.clearContents()
+                    pasteboard.setString(log.exportText(), forType: .string)
+                }
+                .disabled(log.entries.isEmpty)
+
+                Button("清空") {
+                    log.clear()
+                }
+                .disabled(log.entries.isEmpty)
+            }
+            .padding()
+
+            Divider()
+
+            if log.entries.isEmpty {
+                Spacer()
+                Text("暂无日志")
+                    .foregroundColor(.secondary)
+                Spacer()
+            } else {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 6) {
+                        ForEach(log.entries) { entry in
+                            HStack(alignment: .top, spacing: 8) {
+                                Text(entry.timestampText)
+                                    .font(.system(.caption, design: .monospaced))
+                                    .foregroundColor(.secondary)
+
+                                Text(entry.level.rawValue)
+                                    .font(.system(.caption2, design: .monospaced))
+                                    .foregroundColor(entry.level == .error ? .red : .secondary)
+                                    .frame(width: 46, alignment: .leading)
+
+                                Text(entry.message)
+                                    .font(.system(.caption, design: .monospaced))
+                                    .textSelection(.enabled)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                        }
+                    }
+                    .padding(12)
+                }
+            }
+        }
     }
 }

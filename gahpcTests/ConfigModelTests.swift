@@ -92,6 +92,25 @@ final class ConfigModelTests: XCTestCase {
         XCTAssertTrue(normalized.rsaPublicKey.hasPrefix("-----BEGIN PUBLIC KEY-----"))
     }
 
+    func testLANExposureDetection() {
+        var config = makeValidConfig()
+
+        config.bindAddress = "127.0.0.1"
+        XCTAssertFalse(config.isExposingToLAN)
+
+        config.bindAddress = "::1"
+        XCTAssertFalse(config.isExposingToLAN)
+
+        config.bindAddress = "localhost"
+        XCTAssertFalse(config.isExposingToLAN)
+
+        config.bindAddress = "0.0.0.0"
+        XCTAssertTrue(config.isExposingToLAN)
+
+        config.bindAddress = "192.168.1.10"
+        XCTAssertTrue(config.isExposingToLAN)
+    }
+
     func testMissingJSONFieldsUseDefaults() throws {
         let data = Data(#"{"proxy_server_address":"legacy.example"}"#.utf8)
         let config = try JSONDecoder().decode(ConfigModel.self, from: data)

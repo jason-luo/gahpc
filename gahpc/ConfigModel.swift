@@ -120,6 +120,14 @@ struct ConfigModel: Codable, Equatable {
         return copy
     }
 
+    var isExposingToLAN: Bool {
+        let bind = bindAddress.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !bind.isEmpty else { return false }
+        return bind != "::1"
+            && bind.lowercased() != "localhost"
+            && !bind.hasPrefix("127.")
+    }
+
     private static func isValidBindAddress(_ value: String) -> Bool {
         if value == "localhost" {
             return true

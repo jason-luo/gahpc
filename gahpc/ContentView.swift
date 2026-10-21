@@ -127,7 +127,7 @@ struct ContentView: View {
                 }
             }
 
-            if isExposingToLAN {
+            if config.isExposingToLAN {
                 Label("当前绑定地址可能允许局域网访问", systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)
                     .foregroundColor(.orange)
@@ -268,7 +268,7 @@ struct ContentView: View {
             return
         }
 
-        if isExposingToLAN {
+        if config.isExposingToLAN {
             showExposureWarning = true
             return
         }
@@ -322,11 +322,6 @@ struct ContentView: View {
         return config.validationError()
     }
 
-    private var isExposingToLAN: Bool {
-        let bind = config.bindAddress.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !bind.isEmpty else { return false }
-        return bind != "::1" && bind != "localhost" && !bind.hasPrefix("127.")
-    }
 
     @discardableResult
     private func saveConfig(showErrors: Bool = false) -> Bool {
@@ -335,6 +330,7 @@ struct ContentView: View {
             try config.save()
             return true
         } catch {
+            AppLog.shared.error("保存配置失败：\(error.localizedDescription)")
             if showErrors {
                 errorMessage = "保存配置失败：\(error.localizedDescription)"
                 showError = true
