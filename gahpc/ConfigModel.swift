@@ -1,4 +1,5 @@
 import Foundation
+import Security
 
 /// Swift-side configuration matching the Rust `Config` struct.
 struct ConfigModel: Codable {
@@ -30,18 +31,149 @@ struct ConfigModel: Codable {
 // MARK: - Persistence
 
 extension ConfigModel {
+    private static let storageKey = "proxy_config"
+
     static func load() -> ConfigModel? {
-        guard let data = UserDefaults.standard.data(forKey: "proxy_config") else { return nil }
+        guard let data = UserDefaults.standard.data(forKey: storageKey) else { return nil }
         guard var config = try? JSONDecoder().decode(ConfigModel.self, from: data) else { return nil }
+
         // Normalize: replace literal \n with actual newlines (fix for previously saved data)
         config.rsaPublicKey = config.rsaPublicKey
             .replacingOccurrences(of: "\\n", with: "\n")
+
+        // Auth Key belongs in the Keychain. Older versions stored it inside the
+        // UserDefaults JSON, so migrate it and scrub the legacy copy when possible.
+        let legacyAuthKey = config.authKey
+        let keychainAuthKey: String?
+        do {
+            keychainAuthKey = try KeychainStore.loadAuthKey()
+        } catch {
+            keychainAuthKey = nil
+        }
+
+        if let keychainAuthKey, !keychainAuthKey.isEmpty {
+            config.authKey = keychainAuthKey
+            if !legacyAuthKey.isEmpty {
+                // Remove the Auth Key from the old UserDefaults payload.
+                try? config.save()
+            }
+        } else if !legacyAuthKey.isEmpty {
+            config.authKey = legacyAuthKey
+            do {
+                try config.save()
+            } catch {
+                // Keep the value in memory for this session. The next successful
+                // save retries the migration; it is never written back to
+                // UserDefaults from this version onward.
+            }
+        } else {
+            config.authKey = ""
+        }
+
         return config
     }
 
-    func save() {
-        guard let data = try? JSONEncoder().encode(self) else { return }
-        UserDefaults.standard.set(data, forKey: "proxy_config")
+    /// Persists non-secret settings to UserDefaults and the Auth Key to the
+    /// Keychain. The Auth Key is never included in the UserDefaults payload.
+    func save() throws {
+        try KeychainStore.saveAuthKey(authKey)
+
+        var persisted = self
+        persisted.authKey = ""
+        let data = try JSONEncoder().encode(persisted)
+        UserDefaults.standard.set(data, forKey: Self.storageKey)
+    }
+}
+
+// MARK: - Keychain
+
+/// Minimal Keychain wrapper for the Auth Key. The item is scoped to this app's
+/// service/account pair and is not synchronized to iCloud.
+enum KeychainStore {
+    private static let service = "xyz.luoxy.gahpc"
+    private static let account = "auth_key"
+
+    private static var baseQuery: [String: Any] {
+        [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account
+        ]
+    }
+
+    static func loadAuthKey() throws -> String? {
+        var query = baseQuery
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+
+        var result: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+
+        switch status {
+        case errSecSuccess:
+            guard let data = result as? Data,
+                  let key = String(data: data, encoding: .utf8) else {
+                throw KeychainError.invalidData
+            }
+            return key
+        case errSecItemNotFound:
+            return nil
+        default:
+            throw KeychainError.operationFailed(status)
+        }
+    }
+
+    static func saveAuthKey(_ key: String) throws {
+        guard !key.isEmpty else {
+            try deleteAuthKey()
+            return
+        }
+
+        let data = Data(key.utf8)
+        let attributes: [String: Any] = [
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock
+        ]
+
+        let updateStatus = SecItemUpdate(baseQuery as CFDictionary, attributes as CFDictionary)
+        if updateStatus == errSecSuccess {
+            return
+        }
+        guard updateStatus == errSecItemNotFound else {
+            throw KeychainError.operationFailed(updateStatus)
+        }
+
+        var addQuery = baseQuery
+        addQuery[kSecValueData as String] = data
+        addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+
+        let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
+        guard addStatus == errSecSuccess else {
+            throw KeychainError.operationFailed(addStatus)
+        }
+    }
+
+    static func deleteAuthKey() throws {
+        let status = SecItemDelete(baseQuery as CFDictionary)
+        guard status == errSecSuccess || status == errSecItemNotFound else {
+            throw KeychainError.operationFailed(status)
+        }
+    }
+}
+
+enum KeychainError: LocalizedError {
+    case invalidData
+    case operationFailed(OSStatus)
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidData:
+            return "钥匙串中的 Auth Key 数据无效"
+        case .operationFailed(let status):
+            let message = SecCopyErrorMessageString(status, nil) as String?
+                ?? "未知错误"
+            return "钥匙串操作失败（\(status)）：\(message)"
+        }
     }
 }
 

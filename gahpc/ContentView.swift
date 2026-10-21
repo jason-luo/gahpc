@@ -22,6 +22,7 @@ struct ContentView: View {
     @State private var statusMessage = "空闲"
     @State private var showError = false
     @State private var errorMessage = ""
+    @State private var isAuthKeyVisible = false
 
     @ObservedObject private var notices = AppNotices.shared
 
@@ -51,14 +52,14 @@ struct ContentView: View {
             presentAutoStartErrorIfNeeded()
         }
         .onDisappear {
-            config.save()
+            _ = saveConfig()
         }
         .onReceive(statusTimer) { _ in updateStatus() }
         .onChange(of: notices.autoStartError) { _ in
             presentAutoStartErrorIfNeeded()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willResignActiveNotification)) { _ in
-            config.save()
+            _ = saveConfig()
         }
     }
 
@@ -128,12 +129,32 @@ struct ContentView: View {
             }
 
             LabeledContent("Auth Key") {
-                TextField(text: $config.authKey, prompt: Text("可选")) {
-                    EmptyView()
+                HStack(spacing: 6) {
+                    Group {
+                        if isAuthKeyVisible {
+                            TextField(text: $config.authKey, prompt: Text("可选")) {
+                                EmptyView()
+                            }
+                        } else {
+                            SecureField(text: $config.authKey, prompt: Text("可选")) {
+                                EmptyView()
+                            }
+                        }
+                    }
+                    .textFieldStyle(.roundedBorder)
+                    .multilineTextAlignment(.trailing)
+                    .privacySensitive()
+
+                    Button {
+                        isAuthKeyVisible.toggle()
+                    } label: {
+                        Image(systemName: isAuthKeyVisible ? "eye.slash" : "eye")
+                    }
+                    .buttonStyle(.borderless)
+                    .help(isAuthKeyVisible ? "隐藏 Auth Key" : "显示 Auth Key")
+                    .accessibilityLabel(isAuthKeyVisible ? "隐藏 Auth Key" : "显示 Auth Key")
                 }
-                .textFieldStyle(.roundedBorder)
-                .multilineTextAlignment(.trailing)
-                .frame(maxWidth: 200)
+                .frame(maxWidth: 240)
             }
         }
     }
@@ -190,7 +211,7 @@ struct ContentView: View {
                 Text("应用启动时自动运行")
             }
             .onChange(of: config.autoStart) { _ in
-                config.save()
+                _ = saveConfig(showErrors: true)
             }
         }
     }
@@ -206,8 +227,10 @@ struct ContentView: View {
     }
 
     private func startProxy() {
-        // Save config before starting
-        config.save()
+        // Persist non-secret settings and the Auth Key. If the Keychain is
+        // temporarily unavailable, the in-memory key is still used for this
+        // session and the save error is shown to the user.
+        _ = saveConfig(showErrors: true)
 
         switch bridge.start(config: config) {
         case .success:
@@ -227,6 +250,20 @@ struct ContentView: View {
         case .failure(let err):
             errorMessage = err.localizedDescription
             showError = true
+        }
+    }
+
+    @discardableResult
+    private func saveConfig(showErrors: Bool = false) -> Bool {
+        do {
+            try config.save()
+            return true
+        } catch {
+            if showErrors {
+                errorMessage = "保存配置失败：\(error.localizedDescription)"
+                showError = true
+            }
+            return false
         }
     }
 

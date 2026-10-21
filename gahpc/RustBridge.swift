@@ -38,13 +38,12 @@ final class RustBridge: @unchecked Sendable {
         normalizedConfig.rsaPublicKey = config.rsaPublicKey
             .replacingOccurrences(of: "\\n", with: "\n")
 
+        // This payload includes the Auth Key for the Rust FFI. Never log it.
         guard let jsonData = try? JSONEncoder().encode(normalizedConfig),
               let jsonString = String(data: jsonData, encoding: .utf8)
         else {
             return .failure(.configError("配置序列化失败"))
         }
-
-        print("[RustBridge] Config JSON: \(jsonString)")
 
         return queue.sync {
             let result = ahpc_start(jsonString)
