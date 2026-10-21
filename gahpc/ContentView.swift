@@ -1,29 +1,18 @@
 import SwiftUI
 
-// MARK: - Supported Ciphers
-
-private let supportedCiphers = [
-    "aes-128-cfb",
-    "aes-192-cfb",
-    "aes-256-cfb",
-    "aes-128-ofb",
-    "aes-192-ofb",
-    "aes-256-ofb",
-    "aes-128-ctr",
-    "aes-192-ctr",
-    "aes-256-ctr",
-]
-
 // MARK: - ContentView
 
 struct ContentView: View {
     @State private var config: ConfigModel
     @State private var appSettings: AppSettings
+    @State private var proxyPortText: String
+    @State private var listenPortText: String
     @State private var isRunning = false
     @State private var statusMessage = "空闲"
     @State private var showError = false
     @State private var errorMessage = ""
     @State private var isAuthKeyVisible = false
+    @State private var showExposureWarning = false
     @State private var autosaveWorkItem: DispatchWorkItem?
 
     @ObservedObject private var notices = AppNotices.shared
@@ -33,8 +22,15 @@ struct ContentView: View {
 
     init() {
         let settings = AppSettings.load()
+        var loaded = ConfigModel.load() ?? ConfigModel()
+        if !ConfigModel.supportedCiphers.contains(loaded.cipher) {
+            loaded.cipher = ConfigModel().cipher
+        }
+
         _appSettings = State(initialValue: settings)
-        _config = State(initialValue: ConfigModel.load() ?? ConfigModel())
+        _config = State(initialValue: loaded)
+        _proxyPortText = State(initialValue: loaded.proxyServerPort == 0 ? "" : String(loaded.proxyServerPort))
+        _listenPortText = State(initialValue: loaded.listenPort == 0 ? "" : String(loaded.listenPort))
     }
 
     var body: some View {
@@ -51,6 +47,17 @@ struct ContentView: View {
         } message: {
             Text(errorMessage)
         }
+        .confirmationDialog(
+            "绑定地址不是本机回环地址",
+            isPresented: $showExposureWarning
+        ) {
+            Button("仍然启动", role: .destructive) {
+                performStart()
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("当前绑定 \(config.bindAddress)，局域网内其他设备可能访问该代理。")
+        }
         .onAppear {
             updateStatus()
             presentAutoStartErrorIfNeeded()
@@ -64,6 +71,16 @@ struct ContentView: View {
         }
         .onChange(of: config) { _ in
             scheduleAutosave()
+        }
+        .onChange(of: proxyPortText) { _ in
+            if let port = parsedPort(proxyPortText) {
+                config.proxyServerPort = port
+            }
+        }
+        .onChange(of: listenPortText) { _ in
+            if let port = parsedPort(listenPortText) {
+                config.listenPort = port
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willResignActiveNotification)) { _ in
             saveNow()
@@ -89,7 +106,7 @@ struct ContentView: View {
 
                     Text(":").foregroundColor(.secondary)
 
-                    TextField(text: portBinding($config.proxyServerPort), prompt: Text("端口")) {
+                    TextField(text: $proxyPortText, prompt: Text("端口")) {
                         EmptyView()
                     }
                     .textFieldStyle(.roundedBorder)
@@ -107,13 +124,19 @@ struct ContentView: View {
 
                     Text(":").foregroundColor(.secondary)
 
-                    TextField(text: portBinding($config.listenPort), prompt: Text("端口")) {
+                    TextField(text: $listenPortText, prompt: Text("端口")) {
                         EmptyView()
                     }
                     .textFieldStyle(.roundedBorder)
                     .multilineTextAlignment(.trailing)
                     .frame(width: 70)
                 }
+            }
+
+            if isExposingToLAN {
+                Label("当前绑定地址可能允许局域网访问", systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundColor(.orange)
             }
         }
     }
@@ -135,7 +158,7 @@ struct ContentView: View {
             }
 
             Picker("加密算法", selection: $config.cipher) {
-                ForEach(supportedCiphers, id: \.self) { cipher in
+                ForEach(ConfigModel.supportedCiphers, id: \.self) { cipher in
                     Text(cipher).tag(cipher)
                 }
             }
@@ -225,6 +248,12 @@ struct ContentView: View {
             .onChange(of: appSettings.autoStart) { _ in
                 appSettings.save()
             }
+
+            if isRunning {
+                Label("代理运行中，修改配置将在下次启动时生效。", systemImage: "info.circle")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
         }
     }
 
@@ -239,6 +268,21 @@ struct ContentView: View {
     }
 
     private func startProxy() {
+        if let message = validateForStart() {
+            errorMessage = message
+            showError = true
+            return
+        }
+
+        if isExposingToLAN {
+            showExposureWarning = true
+            return
+        }
+
+        performStart()
+    }
+
+    private func performStart() {
         // Persist non-secret settings and the Auth Key. If the Keychain is
         // temporarily unavailable, the in-memory key is still used for this
         // session and the save error is shown to the user.
@@ -254,6 +298,26 @@ struct ContentView: View {
         }
     }
 
+    private func validateForStart() -> String? {
+        guard let proxyPort = parsedPort(proxyPortText) else {
+            return "代理服务器端口必须是 1–65535 的整数。"
+        }
+        guard let listenPort = parsedPort(listenPortText) else {
+            return "本地监听端口必须是 1–65535 的整数。"
+        }
+
+        config.proxyServerPort = proxyPort
+        config.listenPort = listenPort
+        config = config.normalized()
+        return config.validationError()
+    }
+
+    private var isExposingToLAN: Bool {
+        let bind = config.bindAddress.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !bind.isEmpty else { return false }
+        return bind != "::1" && bind != "localhost" && !bind.hasPrefix("127.")
+    }
+
     private func stopProxy() {
         switch bridge.stop() {
         case .success:
@@ -267,6 +331,7 @@ struct ContentView: View {
 
     @discardableResult
     private func saveConfig(showErrors: Bool = false) -> Bool {
+        syncPortsFromText()
         do {
             try config.save()
             return true
@@ -277,6 +342,21 @@ struct ContentView: View {
             }
             return false
         }
+    }
+
+    private func syncPortsFromText() {
+        if let port = parsedPort(proxyPortText) {
+            config.proxyServerPort = port
+        }
+        if let port = parsedPort(listenPortText) {
+            config.listenPort = port
+        }
+    }
+
+    private func parsedPort(_ text: String) -> UInt16? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let port = UInt16(trimmed), port > 0 else { return nil }
+        return port
     }
 
     private func scheduleAutosave() {
@@ -310,22 +390,6 @@ struct ContentView: View {
         errorMessage = "自动启动失败：\(message)"
         showError = true
     }
-}
-
-// MARK: - Port Binding Helper
-
-/// Creates a string binding that maps to a UInt16 value binding.
-/// This avoids the macOS `TextField` title-as-label issue where placeholders
-/// don't disappear after entering a value.
-private func portBinding(_ number: Binding<UInt16>) -> Binding<String> {
-    Binding<String>(
-        get: { number.wrappedValue == 0 ? "" : "\(number.wrappedValue)" },
-        set: {
-            if let value = UInt16($0.filter(\.isNumber)) {
-                number.wrappedValue = value
-            }
-        }
-    )
 }
 
 // MARK: - Status Dot

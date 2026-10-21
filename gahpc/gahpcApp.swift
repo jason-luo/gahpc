@@ -157,7 +157,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         guard AppSettings.load().autoStart else { return }
-        guard let config = ConfigModel.load() else { return }
+        guard let loadedConfig = ConfigModel.load() else { return }
+
+        let config = loadedConfig.normalized()
+        if let validationError = config.validationError() {
+            AppNotices.shared.autoStartError = validationError
+            return
+        }
 
         // Starting can block while Rust parses the key and initializes its
         // runtime, so never do it on the main thread.

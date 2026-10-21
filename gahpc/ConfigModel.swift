@@ -1,5 +1,6 @@
 import Foundation
 import Security
+import Darwin
 
 /// Swift-side configuration matching the Rust `Config` struct.
 struct ConfigModel: Codable, Equatable {
@@ -51,6 +52,83 @@ struct ConfigModel: Codable, Equatable {
             ?? defaults.workers
         authKey = try container.decodeIfPresent(String.self, forKey: .authKey)
             ?? defaults.authKey
+    }
+
+    static let supportedCiphers = [
+        "aes-128-cfb",
+        "aes-192-cfb",
+        "aes-256-cfb",
+        "aes-128-ofb",
+        "aes-192-ofb",
+        "aes-256-ofb",
+        "aes-128-ctr",
+        "aes-192-ctr",
+        "aes-256-ctr",
+    ]
+
+    /// Returns a user-facing validation message, or nil when the configuration
+    /// is safe to hand to the Rust engine.
+    func validationError() -> String? {
+        let server = proxyServerAddress.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !server.isEmpty else { return "请填写代理服务器地址。" }
+        guard !server.contains(where: { $0.isWhitespace }) else {
+            return "代理服务器地址不能包含空格。"
+        }
+        guard !server.contains("://") && !server.contains("/") else {
+            return "代理服务器地址只填主机名或 IP，不要包含协议前缀或路径。"
+        }
+
+        guard proxyServerPort > 0 else { return "代理服务器端口必须在 1–65535 之间。" }
+        guard listenPort > 0 else { return "本地监听端口必须在 1–65535 之间。" }
+
+        let bind = bindAddress.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !bind.isEmpty else { return "请填写本地绑定地址。" }
+        guard Self.isValidBindAddress(bind) else {
+            return "本地绑定地址必须是有效的 IPv4/IPv6 地址或 localhost。"
+        }
+
+        guard Self.supportedCiphers.contains(cipher) else {
+            return "不支持的加密算法：\(cipher)。"
+        }
+
+        let key = rsaPublicKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty else { return "请填写 RSA 公钥。" }
+        guard key.contains("-----BEGIN PUBLIC KEY-----")
+            || key.contains("-----BEGIN RSA PUBLIC KEY-----")
+        else {
+            return "RSA 公钥格式不正确，需要 PEM 格式的公钥。"
+        }
+
+        guard timeout >= 30 && timeout <= 600 else {
+            return "超时时间必须在 30–600 秒之间。"
+        }
+        guard (1...16).contains(workers) else {
+            return "工作线程数必须在 1–16 之间。"
+        }
+
+        return nil
+    }
+
+    func normalized() -> ConfigModel {
+        var copy = self
+        copy.proxyServerAddress = proxyServerAddress
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        copy.bindAddress = bindAddress
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        copy.rsaPublicKey = rsaPublicKey
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return copy
+    }
+
+    private static func isValidBindAddress(_ value: String) -> Bool {
+        if value == "localhost" {
+            return true
+        }
+
+        var ipv4 = in_addr()
+        var ipv6 = in6_addr()
+        return inet_pton(AF_INET, value, &ipv4) == 1
+            || inet_pton(AF_INET6, value, &ipv6) == 1
     }
 }
 

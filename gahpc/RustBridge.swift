@@ -50,7 +50,7 @@ final class RustBridge: @unchecked Sendable {
             print("[RustBridge] ahpc_start returned: \(result)")
             switch result {
             case 0:  return .success(())
-            case -1: return .failure(.configError("配置验证失败，请检查 RSA 公钥、加密算法等设置"))
+            case -1: return .failure(.configError("配置验证失败，请检查服务器地址、端口、RSA 公钥和加密算法；若配置无误，请确认本地监听端口未被占用"))
             case -2: return .failure(.alreadyRunning)
             default: return .failure(.unknown(code: result))
             }
