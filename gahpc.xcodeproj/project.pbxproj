@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		6E4E508CACD63EEDD684E630 /* ConfigModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94BB979710F232CCB52C2FA5 /* ConfigModel.swift */; };
+		7A23CA68A05C4C867BE03072 /* ProxyController.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB4CC3AA6B3CC1CC734C9427 /* ProxyController.swift */; };
 		94A06C2F2F3A96429B728CE0 /* ConfigModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94BB979710F232CCB52C2FA5 /* ConfigModel.swift */; };
 		CE723E48AC29511E6845A1BD /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D76C8E720AA988BE7BA68B67 /* Cocoa.framework */; };
 		E5B6AB92D33D43A6244321B4 /* ConfigModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 799E7C61B6E425E208B5642E /* ConfigModelTests.swift */; };
@@ -24,6 +25,7 @@
 		94BB979710F232CCB52C2FA5 /* ConfigModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ConfigModel.swift; sourceTree = "<group>"; };
 		D76C8E720AA988BE7BA68B67 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
 		DFF1E9D48EE76518391CF399 /* gahpcTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = gahpcTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		EB4CC3AA6B3CC1CC734C9427 /* ProxyController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ProxyController.swift; sourceTree = "<group>"; };
 		F52FCB4BA38A5A2BE9AE35DF /* RustBridge.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RustBridge.swift; sourceTree = "<group>"; };
 		F63F06432FECDE15000BBE22 /* ahpc-rs */ = {isa = PBXFileReference; lastKnownFileType = folder; path = "ahpc-rs"; sourceTree = "<group>"; };
 		F63F06452FECDE2B000BBE22 /* scripts */ = {isa = PBXFileReference; lastKnownFileType = folder; path = scripts; sourceTree = "<group>"; };
@@ -94,6 +96,7 @@
 				94BB979710F232CCB52C2FA5 /* ConfigModel.swift */,
 				F52FCB4BA38A5A2BE9AE35DF /* RustBridge.swift */,
 				1BA78DBB17C660A52689DE00 /* gahpc-Bridging-Header.h */,
+				EB4CC3AA6B3CC1CC734C9427 /* ProxyController.swift */,
 			);
 			path = gahpc;
 			sourceTree = "<group>";
@@ -254,6 +257,7 @@
 				F6F017422FEA8C7600E30771 /* gahpcApp.swift in Sources */,
 				94A06C2F2F3A96429B728CE0 /* ConfigModel.swift in Sources */,
 				F370F7A3B22DEA6F4BF8532B /* RustBridge.swift in Sources */,
+				7A23CA68A05C4C867BE03072 /* ProxyController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

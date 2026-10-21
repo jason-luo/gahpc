@@ -11,36 +11,6 @@ import AppKit
 import Foundation
 import ServiceManagement
 
-// MARK: - Shared Status Observer
-
-/// Observable object that periodically polls the Rust bridge for proxy status.
-/// Used by both the menu bar icon and the dropdown menu.
-class ProxyStatus: ObservableObject {
-    @Published var isRunning = false
-    private var cancellable: AnyCancellable?
-
-    init() {
-        cancellable = Timer.publish(every: 2, on: .main, in: .common)
-            .autoconnect()
-            .sink { [weak self] _ in
-                self?.isRunning = RustBridge.shared.status()
-            }
-    }
-}
-
-// MARK: - App Notices
-
-/// App-level notices that must survive independently of any window.
-final class AppNotices: ObservableObject {
-    static let shared = AppNotices()
-
-    /// Error from the automatic start attempted at app launch.
-    /// Consumed by the settings panel (and the menu item that opens it).
-    @Published var autoStartError: String?
-
-    private init() {}
-}
-
 // MARK: - Login Item
 
 /// Wraps `SMAppService.mainApp` and keeps the menu toggle in sync with the
@@ -161,26 +131,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let config = loadedConfig.normalized()
         if let validationError = config.validationError() {
-            AppNotices.shared.autoStartError = validationError
+            ProxyController.shared.report(error: validationError)
             return
         }
 
-        // Starting can block while Rust parses the key and initializes its
-        // runtime, so never do it on the main thread.
-        DispatchQueue.global(qos: .userInitiated).async {
-            guard !RustBridge.shared.status() else { return }
+        ProxyController.shared.start(config: config)
+    }
 
-            switch RustBridge.shared.start(config: config) {
-            case .success(()):
-                break
-            case .failure(.alreadyRunning):
-                break
-            case .failure(let error):
-                DispatchQueue.main.async {
-                    AppNotices.shared.autoStartError = error.localizedDescription
-                }
-            }
-        }
+    func applicationWillTerminate(_ notification: Notification) {
+        ProxyController.shared.stopForTermination()
     }
 }
 
@@ -189,15 +148,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 @main
 struct gahpcApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-    @StateObject private var status = ProxyStatus()
+    @StateObject private var proxy = ProxyController.shared
 
     var body: some Scene {
         // 任务栏图标入口（动态图标）
         MenuBarExtra {
-            MenuContent(status: status)
+            MenuContent()
         } label: {
-            Image(systemName: status.isRunning ? "shield.fill" : "shield")
-                .foregroundStyle(status.isRunning ? .green : .primary)
+            Image(systemName: proxy.isRunning ? "shield.fill" : "shield")
+                .foregroundStyle(proxy.isRunning ? .green : .primary)
         }
         .menuBarExtraStyle(.menu)
 
@@ -214,17 +173,16 @@ struct gahpcApp: App {
 
 struct MenuContent: View {
     @Environment(\.openWindow) private var openWindow
-    @ObservedObject var status: ProxyStatus
-    @ObservedObject private var notices = AppNotices.shared
+    @ObservedObject private var proxy = ProxyController.shared
     @ObservedObject private var loginItem = LoginItemController.shared
 
     var body: some View {
         // 状态显示
         HStack {
             Circle()
-                .fill(status.isRunning ? Color.green : Color.gray)
+                .fill(proxy.isRunning ? Color.green : Color.gray)
                 .frame(width: 8, height: 8)
-            Text(status.isRunning ? "运行中" : "已停止")
+            Text(proxy.statusText)
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
@@ -232,8 +190,8 @@ struct MenuContent: View {
 
         Divider()
 
-        if notices.autoStartError != nil {
-            Button("自动启动失败，查看设置") {
+        if proxy.lastError != nil {
+            Button("代理操作失败，查看设置") {
                 openWindow(id: "settings")
                 NSApp.activate(ignoringOtherApps: true)
             }

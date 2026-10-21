@@ -185,6 +185,7 @@ gahpc/
 │   ├── gahpcApp.swift       # App 入口、菜单栏、开机自启
 │   ├── ContentView.swift    # 设置面板 UI
 │   ├── ConfigModel.swift    # Swift 配置模型与持久化
+│   ├── ProxyController.swift # 代理状态与 FFI 调度
 │   ├── RustBridge.swift     # Rust FFI 桥接封装
 │   ├── gahpc-Bridging-Header.h  # C 函数声明
 │   └── gahpc.entitlements   # Sandbox 权限

@@ -23,6 +23,7 @@ group = project.main_group['gahpc'] || project.main_group.new_group('gahpc')
 
 new_files = %w[
   ConfigModel.swift
+  ProxyController.swift
   RustBridge.swift
   gahpc-Bridging-Header.h
 ]

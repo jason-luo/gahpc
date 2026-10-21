@@ -7,18 +7,13 @@ struct ContentView: View {
     @State private var appSettings: AppSettings
     @State private var proxyPortText: String
     @State private var listenPortText: String
-    @State private var isRunning = false
-    @State private var statusMessage = "空闲"
     @State private var showError = false
     @State private var errorMessage = ""
     @State private var isAuthKeyVisible = false
     @State private var showExposureWarning = false
     @State private var autosaveWorkItem: DispatchWorkItem?
 
-    @ObservedObject private var notices = AppNotices.shared
-
-    private let bridge = RustBridge.shared
-    private let statusTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+    @ObservedObject private var proxy = ProxyController.shared
 
     init() {
         let settings = AppSettings.load()
@@ -59,15 +54,14 @@ struct ContentView: View {
             Text("当前绑定 \(config.bindAddress)，局域网内其他设备可能访问该代理。")
         }
         .onAppear {
-            updateStatus()
-            presentAutoStartErrorIfNeeded()
+            proxy.refreshStatus()
+            presentProxyErrorIfNeeded()
         }
         .onDisappear {
             saveNow()
         }
-        .onReceive(statusTimer) { _ in updateStatus() }
-        .onChange(of: notices.autoStartError) { _ in
-            presentAutoStartErrorIfNeeded()
+        .onChange(of: proxy.lastError) { _ in
+            presentProxyErrorIfNeeded()
         }
         .onChange(of: config) { _ in
             scheduleAutosave()
@@ -225,19 +219,17 @@ struct ContentView: View {
         Section {
             HStack(spacing: 16) {
                 Button(action: toggleProxy) {
-                    Label(
-                        isRunning ? "停止" : "启动",
-                        systemImage: isRunning ? "stop.fill" : "play.fill"
-                    )
-                    .frame(minWidth: 80)
+                    Label(actionTitle, systemImage: actionIcon)
+                        .frame(minWidth: 80)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(isRunning ? .red : .green)
+                .tint(proxy.isRunning ? .red : .green)
+                .disabled(proxy.isBusy)
 
                 Spacer()
 
-                StatusDot(isRunning: isRunning)
-                Text(statusMessage)
+                StatusDot(isRunning: proxy.isRunning)
+                Text(proxy.statusText)
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -249,7 +241,7 @@ struct ContentView: View {
                 appSettings.save()
             }
 
-            if isRunning {
+            if proxy.isRunning {
                 Label("代理运行中，修改配置将在下次启动时生效。", systemImage: "info.circle")
                     .font(.caption)
                     .foregroundColor(.secondary)
@@ -260,8 +252,10 @@ struct ContentView: View {
     // MARK: - Actions
 
     private func toggleProxy() {
-        if isRunning {
-            stopProxy()
+        guard !proxy.isBusy else { return }
+
+        if proxy.isRunning {
+            proxy.stop()
         } else {
             startProxy()
         }
@@ -287,14 +281,30 @@ struct ContentView: View {
         // temporarily unavailable, the in-memory key is still used for this
         // session and the save error is shown to the user.
         _ = saveConfig(showErrors: true)
+        proxy.start(config: config)
+    }
 
-        switch bridge.start(config: config) {
-        case .success:
-            isRunning = true
-            statusMessage = "运行中"
-        case .failure(let err):
-            errorMessage = err.localizedDescription
-            showError = true
+    private var actionTitle: String {
+        switch proxy.state {
+        case .stopped:
+            return "启动"
+        case .starting:
+            return "启动中…"
+        case .running:
+            return "停止"
+        case .stopping:
+            return "停止中…"
+        }
+    }
+
+    private var actionIcon: String {
+        switch proxy.state {
+        case .stopped:
+            return "play.fill"
+        case .starting, .stopping:
+            return "hourglass"
+        case .running:
+            return "stop.fill"
         }
     }
 
@@ -316,17 +326,6 @@ struct ContentView: View {
         let bind = config.bindAddress.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !bind.isEmpty else { return false }
         return bind != "::1" && bind != "localhost" && !bind.hasPrefix("127.")
-    }
-
-    private func stopProxy() {
-        switch bridge.stop() {
-        case .success:
-            isRunning = false
-            statusMessage = "已停止"
-        case .failure(let err):
-            errorMessage = err.localizedDescription
-            showError = true
-        }
     }
 
     @discardableResult
@@ -379,15 +378,10 @@ struct ContentView: View {
         _ = saveConfig()
     }
 
-    private func updateStatus() {
-        isRunning = bridge.status()
-        statusMessage = isRunning ? "运行中" : "空闲"
-    }
-
-    private func presentAutoStartErrorIfNeeded() {
-        guard let message = notices.autoStartError, !message.isEmpty else { return }
-        notices.autoStartError = nil
-        errorMessage = "自动启动失败：\(message)"
+    private func presentProxyErrorIfNeeded() {
+        guard let message = proxy.lastError, !message.isEmpty else { return }
+        proxy.clearError()
+        errorMessage = message
         showError = true
     }
 }
