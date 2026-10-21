@@ -9,6 +9,7 @@ import SwiftUI
 import Combine
 import AppKit
 import Foundation
+import ServiceManagement
 
 // MARK: - Shared Status Observer
 
@@ -38,6 +39,106 @@ final class AppNotices: ObservableObject {
     @Published var autoStartError: String?
 
     private init() {}
+}
+
+// MARK: - Login Item
+
+/// Wraps `SMAppService.mainApp` and keeps the menu toggle in sync with the
+/// real system state. Registration can fail or require approval, especially
+/// for ad-hoc signed builds, so errors must be surfaced instead of only logged.
+final class LoginItemController: ObservableObject {
+    static let shared = LoginItemController()
+
+    @Published private(set) var isEnabled = false
+    @Published private(set) var requiresApproval = false
+    @Published private(set) var errorMessage: String?
+
+    private var cancellable: AnyCancellable?
+
+    private init() {
+        refresh()
+        cancellable = NotificationCenter.default
+            .publisher(for: NSApplication.didBecomeActiveNotification)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                self.refresh(clearError: false)
+                if self.isEnabled {
+                    self.errorMessage = nil
+                }
+            }
+    }
+
+    func refresh() {
+        refresh(clearError: true)
+    }
+
+    private func refresh(clearError: Bool) {
+        let status = SMAppService.mainApp.status
+        isEnabled = status == .enabled
+        requiresApproval = status == .requiresApproval
+
+        if clearError {
+            errorMessage = nil
+        }
+
+        switch status {
+        case .notFound, .requiresApproval, .enabled, .notRegistered:
+            break
+        @unknown default:
+            errorMessage = "未知的登录项状态"
+        }
+    }
+
+    private var isInApplications: Bool {
+        let path = Bundle.main.bundleURL.standardizedFileURL.path
+        return path.hasPrefix("/Applications/")
+            || path.hasPrefix(NSHomeDirectory() + "/Applications/")
+    }
+
+    func setEnabled(_ enabled: Bool) {
+        errorMessage = nil
+
+        let currentStatus = SMAppService.mainApp.status
+
+        // Turning off an item that was never registered should not surface an
+        // error. Turning on an item that is waiting for approval should point
+        // the user to System Settings instead of trying to register again.
+        if !enabled, currentStatus == .notRegistered {
+            refresh()
+            return
+        }
+        if enabled, currentStatus == .requiresApproval {
+            refresh()
+            return
+        }
+
+        do {
+            if enabled {
+                try SMAppService.mainApp.register()
+            } else {
+                try SMAppService.mainApp.unregister()
+            }
+        } catch {
+            var message = "登录项设置失败：\(error.localizedDescription)"
+            if !isInApplications {
+                message += "；请将 app 放到 /Applications 后重试"
+            }
+            errorMessage = message
+            // Refresh the flags but preserve the error message.
+            refresh(clearError: false)
+            return
+        }
+
+        refresh()
+
+        if enabled, SMAppService.mainApp.status == .notFound {
+            errorMessage = "未找到登录项，请将 app 放到 /Applications 后重试"
+        }
+    }
+
+    func openSystemSettings() {
+        SMAppService.openSystemSettingsLoginItems()
+    }
 }
 
 // MARK: - App Delegate
@@ -108,7 +209,7 @@ struct MenuContent: View {
     @Environment(\.openWindow) private var openWindow
     @ObservedObject var status: ProxyStatus
     @ObservedObject private var notices = AppNotices.shared
-    @State private var autoLaunch = false
+    @ObservedObject private var loginItem = LoginItemController.shared
 
     var body: some View {
         // 状态显示
@@ -137,15 +238,25 @@ struct MenuContent: View {
             openWindow(id: "settings")
             NSApp.activate(ignoringOtherApps: true)
         }
-        .task {
-            autoLaunch = getLaunchStatus()
-        }
 
         // 2. 开机自启开关
-        Toggle("登录时自动启动", isOn: $autoLaunch)
-            .onChange(of: autoLaunch) { newValue in
-                setLoginLaunch(enable: newValue)
+        Toggle("登录时自动启动", isOn: loginItemBinding)
+
+        if let errorMessage = loginItem.errorMessage {
+            Text(errorMessage)
+                .font(.caption)
+                .foregroundColor(.red)
+        }
+
+        if loginItem.requiresApproval {
+            Button("需要在系统设置中批准登录项") {
+                loginItem.openSystemSettings()
             }
+        } else if loginItem.errorMessage != nil {
+            Button("打开登录项设置") {
+                loginItem.openSystemSettings()
+            }
+        }
 
         Divider()
 
@@ -154,24 +265,11 @@ struct MenuContent: View {
             NSApplication.shared.terminate(nil)
         }
     }
-}
 
-// MARK: - Auto-launch helpers
-
-import ServiceManagement
-
-func setLoginLaunch(enable: Bool) {
-    do {
-        if enable {
-            try SMAppService.mainApp.register()
-        } else {
-            try SMAppService.mainApp.unregister()
-        }
-    } catch {
-        print("自启设置失败：\(error)")
+    private var loginItemBinding: Binding<Bool> {
+        Binding(
+            get: { loginItem.isEnabled },
+            set: { loginItem.setEnabled($0) }
+        )
     }
-}
-
-func getLaunchStatus() -> Bool {
-    SMAppService.mainApp.status == .enabled
 }
