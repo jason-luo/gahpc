@@ -7,7 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		6E4E508CACD63EEDD684E630 /* ConfigModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94BB979710F232CCB52C2FA5 /* ConfigModel.swift */; };
 		94A06C2F2F3A96429B728CE0 /* ConfigModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94BB979710F232CCB52C2FA5 /* ConfigModel.swift */; };
+		CE723E48AC29511E6845A1BD /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D76C8E720AA988BE7BA68B67 /* Cocoa.framework */; };
+		E5B6AB92D33D43A6244321B4 /* ConfigModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 799E7C61B6E425E208B5642E /* ConfigModelTests.swift */; };
 		F370F7A3B22DEA6F4BF8532B /* RustBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = F52FCB4BA38A5A2BE9AE35DF /* RustBridge.swift */; };
 		F6F017422FEA8C7600E30771 /* gahpcApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6F017412FEA8C7600E30771 /* gahpcApp.swift */; };
 		F6F017442FEA8C7600E30771 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6F017432FEA8C7600E30771 /* ContentView.swift */; };
@@ -17,7 +20,10 @@
 
 /* Begin PBXFileReference section */
 		1BA78DBB17C660A52689DE00 /* gahpc-Bridging-Header.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = "gahpc-Bridging-Header.h"; sourceTree = "<group>"; };
+		799E7C61B6E425E208B5642E /* ConfigModelTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ConfigModelTests.swift; sourceTree = "<group>"; };
 		94BB979710F232CCB52C2FA5 /* ConfigModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ConfigModel.swift; sourceTree = "<group>"; };
+		D76C8E720AA988BE7BA68B67 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
+		DFF1E9D48EE76518391CF399 /* gahpcTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = gahpcTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F52FCB4BA38A5A2BE9AE35DF /* RustBridge.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RustBridge.swift; sourceTree = "<group>"; };
 		F63F06432FECDE15000BBE22 /* ahpc-rs */ = {isa = PBXFileReference; lastKnownFileType = folder; path = "ahpc-rs"; sourceTree = "<group>"; };
 		F63F06452FECDE2B000BBE22 /* scripts */ = {isa = PBXFileReference; lastKnownFileType = folder; path = scripts; sourceTree = "<group>"; };
@@ -30,6 +36,14 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		451041D3D6CE62E874DDBEE5 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CE723E48AC29511E6845A1BD /* Cocoa.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F6F0173B2FEA8C7600E30771 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -40,6 +54,14 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		2A1C74CCE7433AB395604B04 /* OS X */ = {
+			isa = PBXGroup;
+			children = (
+				D76C8E720AA988BE7BA68B67 /* Cocoa.framework */,
+			);
+			name = "OS X";
+			sourceTree = "<group>";
+		};
 		F6F017352FEA8C7500E30771 = {
 			isa = PBXGroup;
 			children = (
@@ -47,6 +69,8 @@
 				F63F06432FECDE15000BBE22 /* ahpc-rs */,
 				F6F017402FEA8C7600E30771 /* gahpc */,
 				F6F0173F2FEA8C7600E30771 /* Products */,
+				FD60B3A9B0C72002105FB0BF /* Frameworks */,
+				FCC1F540B16FD6594A778DE1 /* gahpcTests */,
 			);
 			sourceTree = "<group>";
 		};
@@ -54,6 +78,7 @@
 			isa = PBXGroup;
 			children = (
 				F6F0173E2FEA8C7600E30771 /* gahpc.app */,
+				DFF1E9D48EE76518391CF399 /* gahpcTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -81,9 +106,43 @@
 			path = "Preview Content";
 			sourceTree = "<group>";
 		};
+		FCC1F540B16FD6594A778DE1 /* gahpcTests */ = {
+			isa = PBXGroup;
+			children = (
+				799E7C61B6E425E208B5642E /* ConfigModelTests.swift */,
+			);
+			name = gahpcTests;
+			path = gahpcTests;
+			sourceTree = "<group>";
+		};
+		FD60B3A9B0C72002105FB0BF /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				2A1C74CCE7433AB395604B04 /* OS X */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		0BD935E7C2F2FEDCD60BCAD4 /* gahpcTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 853D1A47CDA747E9EAC2D743 /* Build configuration list for PBXNativeTarget "gahpcTests" */;
+			buildPhases = (
+				375E9C45C86C4A9D046ED27D /* Sources */,
+				451041D3D6CE62E874DDBEE5 /* Frameworks */,
+				2E1B73C79A57C13941246073 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = gahpcTests;
+			productName = gahpcTests;
+			productReference = DFF1E9D48EE76518391CF399 /* gahpcTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		F6F0173D2FEA8C7600E30771 /* gahpc */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = F6F0174D2FEA8C7800E30771 /* Build configuration list for PBXNativeTarget "gahpc" */;
@@ -131,11 +190,19 @@
 			projectRoot = "";
 			targets = (
 				F6F0173D2FEA8C7600E30771 /* gahpc */,
+				0BD935E7C2F2FEDCD60BCAD4 /* gahpcTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		2E1B73C79A57C13941246073 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F6F0173C2FEA8C7600E30771 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -150,33 +217,35 @@
 /* Begin PBXShellScriptBuildPhase section */
 		A315BF010D048A63C6DD2B13 /* Build Rust Static Library */ = {
 			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			inputFileListPaths = (
 			);
 			inputPaths = (
-				"$(PROJECT_DIR)/ahpc-rs/Cargo.toml",
-				"$(PROJECT_DIR)/ahpc-rs/Cargo.lock",
-				"$(PROJECT_DIR)/ahpc-rs/src/lib.rs",
-				"$(PROJECT_DIR)/ahpc-rs/src/main.rs",
-				"$(PROJECT_DIR)/ahpc-rs/src/config.rs",
-				"$(PROJECT_DIR)/ahpc-rs/src/connection.rs",
-				"$(PROJECT_DIR)/ahpc-rs/src/crypto.rs",
 			);
 			name = "Build Rust Static Library";
 			outputFileListPaths = (
 			);
 			outputPaths = (
-				"$(PROJECT_DIR)/ahpc-rs/target/release/libahpc.a",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "# Build Rust static library (x86_64 only)\nset -euo pipefail\nexport PATH=\"$HOME/.cargo/bin:$PATH\"\ncd \"$SRCROOT\"/ahpc-rs\necho \"🔨 Building Rust static library (x86_64)...\"\ncargo build --release --target x86_64-apple-darwin 2>&1 | sed 's/^/   [x86_64] /'\ncp target/x86_64-apple-darwin/release/libahpc.a target/release/libahpc.a\necho \"✅ Rust x86_64 build complete\"\n";
+			shellScript = "export PATH=\"$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:$PATH\"\nexec /bin/bash \"$SRCROOT/scripts/build-rust.sh\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		375E9C45C86C4A9D046ED27D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E5B6AB92D33D43A6244321B4 /* ConfigModelTests.swift in Sources */,
+				6E4E508CACD63EEDD684E630 /* ConfigModel.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F6F0173A2FEA8C7600E30771 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -191,6 +260,49 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
+		1BA66FDD7EE501B33BD5BF34 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "";
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 13.1;
+				PRODUCT_BUNDLE_IDENTIFIER = xyz.luoxy.gahpcTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "";
+			};
+			name = Release;
+		};
+		D7E5B5C8D667AFED8AA5BDE6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "";
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 13.1;
+				PRODUCT_BUNDLE_IDENTIFIER = xyz.luoxy.gahpcTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "";
+			};
+			name = Debug;
+		};
 		F6F0174B2FEA8C7800E30771 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -395,6 +507,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		853D1A47CDA747E9EAC2D743 /* Build configuration list for PBXNativeTarget "gahpcTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1BA66FDD7EE501B33BD5BF34 /* Release */,
+				D7E5B5C8D667AFED8AA5BDE6 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		F6F017392FEA8C7600E30771 /* Build configuration list for PBXProject "gahpc" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

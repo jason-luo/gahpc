@@ -93,7 +93,7 @@ git checkout feature/static-lib
 
 ```bash
 cd ahpc-rs
-cargo build --release --target x86_64-apple-darwin
+cargo build --release --locked --target x86_64-apple-darwin
 cp target/x86_64-apple-darwin/release/libahpc.a target/release/libahpc.a
 ```
 
@@ -121,6 +121,24 @@ codesign --force --sign - \
 测试登录项时，请先把 app 放到 `/Applications`；首次读取 Keychain 可能需要在系统弹窗中允许。
 
 > **注意：** Xcode 的 "Build Rust Static Library" 脚本阶段会自动执行 `cargo build`，如果遇到 `cargo: command not found`，检查脚本中 `PATH` 设置。
+
+### 4. 运行测试
+
+测试 target `gahpcTests` 直接编译 `ConfigModel.swift`，不依赖 Rust 静态库或 GUI：
+
+```bash
+xcodebuild \
+  -project gahpc.xcodeproj \
+  -scheme gahpcTests \
+  -configuration Debug \
+  -destination 'platform=macOS,arch=x86_64' \
+  -derivedDataPath build/TestDerivedData \
+  build CODE_SIGNING_ALLOWED=NO
+
+xcrun xctest build/TestDerivedData/Build/Products/Debug/gahpcTests.xctest
+```
+
+CI 配置在 `.github/workflows/ci.yml`。
 
 ---
 
@@ -151,6 +169,7 @@ codesign --force --sign - \
 
 ```
 gahpc/
+├── .github/workflows/ci.yml # GitHub Actions 构建与测试
 ├── .gitmodules              # Submodule 配置
 ├── ahpc-rs/                 # Rust 代理核心 (submodule)
 │   ├── src/
@@ -167,6 +186,8 @@ gahpc/
 │   ├── RustBridge.swift     # Rust FFI 桥接封装
 │   ├── gahpc-Bridging-Header.h  # C 函数声明
 │   └── gahpc.entitlements   # Sandbox 权限
+├── gahpcTests/
+│   └── ConfigModelTests.swift # 配置校验与解码测试
 ├── gahpc.xcodeproj/         # Xcode 项目
 ├── scripts/
 │   ├── build-rust.sh        # Rust 构建脚本

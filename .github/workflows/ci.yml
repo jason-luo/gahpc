@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: macos-13
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Rust target
+        run: rustup target add x86_64-apple-darwin
+
+      - name: Build app
+        run: |
+          xcodebuild \
+            -project gahpc.xcodeproj \
+            -scheme gahpc \
+            -configuration Debug \
+            -destination 'platform=macOS,arch=x86_64' \
+            -derivedDataPath build/DerivedData \
+            build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO
+
+      - name: Build and run tests
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project gahpc.xcodeproj \
+            -scheme gahpcTests \
+            -configuration Debug \
+            -destination 'platform=macOS,arch=x86_64' \
+            -derivedDataPath build/TestDerivedData \
+            build \
+            CODE_SIGNING_ALLOWED=NO
+          xcrun xctest build/TestDerivedData/Build/Products/Debug/gahpcTests.xctest

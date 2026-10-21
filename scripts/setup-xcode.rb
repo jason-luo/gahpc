@@ -57,43 +57,29 @@ end
 # ── 2. Add Shell Script build phase for Rust ──
 
 script_phase_name = 'Build Rust Static Library'
-existing_phase = target.shell_script_build_phases.find { |p| p.name == script_phase_name }
+phase = target.shell_script_build_phases.find { |p| p.name == script_phase_name }
+phase ||= target.new_shell_script_build_phase(script_phase_name)
 
-unless existing_phase
-  phase = target.new_shell_script_build_phase(script_phase_name)
-  phase.shell_script = <<~BASH
-    # Build Rust static library (x86_64 only)
-    set -euo pipefail
-    export PATH="$HOME/.cargo/bin:$PATH"
-    cd "$SRCROOT"/ahpc-rs
-    echo "🔨 Building Rust static library (x86_64)..."
-    cargo build --release --target x86_64-apple-darwin 2>&1 | sed 's/^/   [x86_64] /'
-    cp target/x86_64-apple-darwin/release/libahpc.a target/release/libahpc.a
-    echo "✅ Rust x86_64 build complete"
-  BASH
+phase.shell_script = <<~BASH
+  export PATH="$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+  exec /bin/bash "$SRCROOT/scripts/build-rust.sh"
+BASH
 
-  # Declare output so Xcode knows when to re-run
-  phase.output_paths = ['$(PROJECT_DIR)/ahpc-rs/target/release/libahpc.a']
-  phase.input_paths = [
-    '$(PROJECT_DIR)/ahpc-rs/Cargo.toml',
-    '$(PROJECT_DIR)/ahpc-rs/Cargo.lock',
-    '$(PROJECT_DIR)/ahpc-rs/src/lib.rs',
-    '$(PROJECT_DIR)/ahpc-rs/src/main.rs',
-    '$(PROJECT_DIR)/ahpc-rs/src/config.rs',
-    '$(PROJECT_DIR)/ahpc-rs/src/connection.rs',
-    '$(PROJECT_DIR)/ahpc-rs/src/crypto.rs',
-  ]
+# Rust sources are not tracked individually by Xcode. Always run the wrapper;
+# cargo itself remains incremental and --locked keeps the dependency set fixed.
+phase.always_out_of_date = '1'
+phase.input_paths = []
+phase.output_paths = []
+phase.input_file_list_paths = []
+phase.output_file_list_paths = []
 
-  # Move to before Sources phase
-  phase_index = target.build_phases.index(phase)
-  sources_index = target.build_phases.index(target.source_build_phase)
-  if phase_index && sources_index && phase_index > sources_index
-    target.build_phases.move_from(phase_index, sources_index)
-  end
-  puts "   ➕ Shell Script phase: #{script_phase_name}"
-else
-  puts "   ⏭  Shell Script phase already exists"
+# Move to before Sources phase
+phase_index = target.build_phases.index(phase)
+sources_index = target.build_phases.index(target.source_build_phase)
+if phase_index && sources_index && phase_index > sources_index
+  target.build_phases.move_from(phase_index, sources_index)
 end
+puts "   ✅ Shell Script phase: #{script_phase_name}"
 
 # ── 3. Update build settings ──
 

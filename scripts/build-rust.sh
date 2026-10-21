@@ -1,19 +1,33 @@
 #!/bin/bash
-# Build Rust static library (x86_64 only).
+# Build the Rust static library used by the Xcode target.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="${SRCROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 RUST_DIR="$PROJECT_DIR/ahpc-rs"
 LIB_NAME="libahpc.a"
+TARGET="x86_64-apple-darwin"
+DEST_DIR="$RUST_DIR/target/release"
 
-echo "🔨 Building Rust static library (x86_64)..."
+export PATH="$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+
+if ! command -v cargo >/dev/null 2>&1; then
+  echo "error: cargo not found. Install Rust or add it to PATH." >&2
+  exit 1
+fi
+
+if [ ! -d "$RUST_DIR" ]; then
+  echo "error: ahpc-rs submodule is missing. Run: git submodule update --init --recursive" >&2
+  exit 1
+fi
+
+echo "🔨 Building Rust static library ($TARGET)..."
 
 cd "$RUST_DIR"
 
-export PATH="$HOME/.cargo/bin:$PATH"
-cargo build --release --target x86_64-apple-darwin 2>&1 | sed 's/^/   [x86_64] /'
+cargo build --release --locked --target "$TARGET" 2>&1 | sed "s/^/   [$TARGET] /"
 
-cp "target/x86_64-apple-darwin/release/$LIB_NAME" "target/release/$LIB_NAME"
+mkdir -p "$DEST_DIR"
+cp -f "$RUST_DIR/target/$TARGET/release/$LIB_NAME" "$DEST_DIR/$LIB_NAME"
 
-echo "✅ Rust x86_64 build complete: $RUST_DIR/target/release/$LIB_NAME"
+echo "✅ Rust $TARGET build complete: $DEST_DIR/$LIB_NAME"
