@@ -107,22 +107,67 @@ cp target/x86_64-apple-darwin/release/libahpc.a target/release/libahpc.a
 bash scripts/build-rust.sh
 ```
 
-### 3. Xcode 构建
+### 3. 构建与打包
+
+以下命令在仓库根目录执行。
+
+#### 命令行（推荐）
+
+```bash
+export PATH="$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+
+xcodebuild \
+  -project gahpc.xcodeproj \
+  -scheme gahpc \
+  -configuration Release \
+  -destination 'platform=macOS,arch=x86_64' \
+  -derivedDataPath build/DerivedData \
+  clean build \
+  CODE_SIGNING_ALLOWED=NO \
+  CODE_SIGNING_REQUIRED=NO
+
+APP="build/DerivedData/Build/Products/Release/gahpc.app"
+
+# 不使用 Developer ID，改用 ad-hoc 签名并保留 sandbox/网络权限
+codesign --force --sign - \
+  --entitlements gahpc/gahpc.entitlements \
+  "$APP"
+
+# 验证签名、图标和架构
+codesign --verify --deep --strict --verbose=2 "$APP"
+plutil -p "$APP/Contents/Info.plist" | grep -E "CFBundleIcon(Name|File)"
+lipo -info "$APP/Contents/MacOS/gahpc"
+```
+
+安装到 `/Applications`（覆盖前先退出旧版本）：
+
+```bash
+rm -rf /Applications/gahpc.app
+ditto "$APP" /Applications/gahpc.app
+open /Applications/gahpc.app
+```
+
+生成可分发压缩包：
+
+```bash
+ditto -c -k --sequesterRsrc --keepParent "$APP" build/gahpc.zip
+```
+
+说明：
+
+- 本项目是 ad-hoc 签名，不提供 Developer ID 签名或公证；跨机器分发可能触发 Gatekeeper。
+- 当前构建为 `x86_64`；Apple Silicon 需要 Rosetta。
+- 测试登录项时请把 app 放到 `/Applications`；首次读取 Keychain 可能需要在系统弹窗中允许。
+- ad-hoc 签名下 `spctl` 校验失败是正常现象，只要 `codesign --verify` 通过即可。
+
+#### Xcode GUI
 
 打开 `gahpc.xcodeproj`，选择 **gahpc** target：
 
 - **Debug 构建：** ⌘R 直接运行
 - **Release 构建：** Product → Build，随后用 Product → Show Build Folder in Finder 查看 `gahpc.app`
 
-本项目面向自用和源码分发，使用 **ad-hoc 签名**，不使用 Developer ID，也不做公证。如果 Xcode 没有自动签名，可以手动签名：
-
-```bash
-codesign --force --sign - \
-  --entitlements gahpc/gahpc.entitlements \
-  "<path-to-gahpc.app>"
-```
-
-测试登录项时，请先把 app 放到 `/Applications`；首次读取 Keychain 可能需要在系统弹窗中允许。
+如果 Xcode 没有自动签名，按上面的 `codesign` 命令手动签名。
 
 > **注意：** Xcode 的 "Build Rust Static Library" 脚本阶段会自动执行 `cargo build`，如果遇到 `cargo: command not found`，检查脚本中 `PATH` 设置。
 
