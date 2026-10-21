@@ -2,7 +2,7 @@
 
 **gahpc** 是一个 macOS 菜单栏应用，为 [ahpc-rs](https://github.com/jason-luo/ahpc-rs) Rust 代理引擎提供原生 GUI 界面。支持 AES 加密隧道、RSA 密钥交换、开机自启等特性。
 
-![macOS](https://img.shields.io/badge/macOS-13.0%2B-brightgreen)
+![macOS](https://img.shields.io/badge/macOS-13.1%2B-brightgreen)
 ![Xcode](https://img.shields.io/badge/Xcode-15.2%2B-blue)
 ![Rust](https://img.shields.io/badge/Rust-1.70%2B-orange)
 
@@ -10,7 +10,7 @@
 
 ## 功能
 
-- **菜单栏图标** — 盾牌图标，运行中变绿
+- **菜单栏图标** — 盾牌图标，运行中切换为实心
 - **设置面板** — 图形化配置代理服务器、加密参数、高级选项
 - **开机自启** — 通过 `SMAppService` 注册登录项
 - **自动运行** — 可设置在应用启动时自动连接代理
@@ -27,7 +27,7 @@
 │                                         │
 │  ┌─ 连接设置 ──────────────────────────┐│
 │  │ 代理服务器 │ [140.82.49.218] : [8090]││
-│  │ 本地绑定   │ [127.0.0.1]    : [8082] ││
+│  │ 本地绑定   │ [127.0.0.1]    : [8089] ││
 │  └──────────────────────────────────────┘│
 │  ┌─ 加密设置 ──────────────────────────┐│
 │  │ RSA 公钥 (PEM)                       ││
@@ -57,7 +57,7 @@
 
 | 工具 | 版本要求 |
 |---|---|
-| macOS | 13.0+ (Ventura) |
+| macOS | 13.1+ (Ventura) |
 | Xcode | 15.2+ |
 | Rust | 1.70+ ([rustup](https://rustup.rs)) |
 | 目标 | `x86_64-apple-darwin` |
@@ -67,6 +67,8 @@
 ```bash
 rustup target add x86_64-apple-darwin
 ```
+
+> 当前工程只构建 `x86_64`。Apple Silicon 机器需要安装 Rosetta 才能运行；原生 arm64/Universal 构建暂未启用。
 
 ### 运行环境
 
@@ -106,7 +108,17 @@ bash scripts/build-rust.sh
 打开 `gahpc.xcodeproj`，选择 **gahpc** target：
 
 - **Debug 构建：** ⌘R 直接运行
-- **Release 归档：** Product → Archive → Distribute App → Copy App
+- **Release 构建：** Product → Build，随后用 Product → Show Build Folder in Finder 查看 `gahpc.app`
+
+本项目面向自用和源码分发，使用 **ad-hoc 签名**，不使用 Developer ID，也不做公证。如果 Xcode 没有自动签名，可以手动签名：
+
+```bash
+codesign --force --sign - \
+  --entitlements gahpc/gahpc.entitlements \
+  "<path-to-gahpc.app>"
+```
+
+测试登录项时，请先把 app 放到 `/Applications`；首次读取 Keychain 可能需要在系统弹窗中允许。
 
 > **注意：** Xcode 的 "Build Rust Static Library" 脚本阶段会自动执行 `cargo build`，如果遇到 `cargo: command not found`，检查脚本中 `PATH` 设置。
 
@@ -121,17 +133,17 @@ bash scripts/build-rust.sh
    - **代理服务器** — AHP 服务器的地址和端口
    - **RSA 公钥** — 从服务器管理员获取的 PEM 格式公钥
    - **加密算法** — 选择与服务端一致的加密模式
-   - **本地绑定** — 本地监听地址（默认 `127.0.0.1:8082`）
+   - **本地绑定** — 本地监听地址（默认 `127.0.0.1:8089`）
 3. 其他选项保持默认即可
 
 ### 启动
 
-- 点击 **启动** 按钮，菜单栏图标变为绿色 🟢
+- 点击 **启动** 按钮，菜单栏图标切换为实心盾牌
 - 开启 **应用启动时自动运行**，下次启动应用自动连接
 
 ### 配置浏览器
 
-将代理设置指向 `127.0.0.1:8082`（或你自定义的端口），即可通过加密隧道访问网络。
+将代理设置指向 `127.0.0.1:8089`（或你自定义的端口），即可通过加密隧道访问网络。
 
 ---
 
@@ -159,6 +171,7 @@ gahpc/
 ├── scripts/
 │   ├── build-rust.sh        # Rust 构建脚本
 │   └── setup-xcode.rb       # Xcode 项目配置脚本
+├── LICENSE
 └── README.md
 ```
 
@@ -169,6 +182,17 @@ gahpc/
      ▲                                                │
      └────────────── plaintext ◀──────────────────────┘
 ```
+
+---
+
+## 分发方式
+
+本项目按 **自用 + 源码分发** 配置：
+
+- 不使用 Developer ID，不做公证，不提供可信的预编译分发包。
+- 自己构建出的 `.app` 是 ad-hoc 签名；复制到其他 Mac 时可能被 Gatekeeper 拦截，需要手动允许。
+- 源码分发时，接收方需要自行安装 Xcode/Rust 并构建。
+- 当前只支持 `x86_64`；Apple Silicon 需要 Rosetta，原生 arm64/Universal 暂未启用。
 
 ---
 
@@ -190,6 +214,33 @@ Sandbox 权限不足。`gahpc.entitlements` 已包含：
 <key>com.apple.security.network.server</key>  <!-- 监听端口 -->
 <key>com.apple.security.network.client</key>  <!-- 出站连接 -->
 ```
+
+### Auth Key 存在哪里？
+
+Auth Key 保存在 Keychain 中：
+
+- service: `xyz.luoxy.gahpc`
+- account: `auth_key`
+
+`UserDefaults` 里的 `proxy_config` 不再保存明文 Auth Key。ad-hoc 重新构建后，macOS 可能再次弹出 Keychain 授权，点“始终允许”即可。
+
+### 登录时自动启动失败
+
+请确认：
+
+1. app 已放到 `/Applications`。
+2. 系统设置 → 通用 → 登录项中允许该 app。
+3. 当前是 ad-hoc 签名，`SMAppService` 可能被 macOS 拒绝；这是签名限制，不代表配置错误。
+
+### 提示“无法验证开发者”
+
+本地构建通常不会触发；如果 app 经过压缩/网络传输后再打开，可能带上 quarantine 标记。确认来源可信后可以：
+
+```bash
+xattr -dr com.apple.quarantine /Applications/gahpc.app
+```
+
+ad-hoc 签名下 `spctl` 校验失败是正常现象，不等于 app 无法运行。
 
 ### `.app` 体积异常大（800MB+）
 
