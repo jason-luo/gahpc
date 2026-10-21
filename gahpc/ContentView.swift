@@ -23,6 +23,8 @@ struct ContentView: View {
     @State private var showError = false
     @State private var errorMessage = ""
 
+    @ObservedObject private var notices = AppNotices.shared
+
     private let bridge = RustBridge.shared
     private let statusTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
@@ -46,12 +48,15 @@ struct ContentView: View {
         }
         .onAppear {
             updateStatus()
-            autoStartIfNeeded()
+            presentAutoStartErrorIfNeeded()
         }
         .onDisappear {
             config.save()
         }
         .onReceive(statusTimer) { _ in updateStatus() }
+        .onChange(of: notices.autoStartError) { _ in
+            presentAutoStartErrorIfNeeded()
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willResignActiveNotification)) { _ in
             config.save()
         }
@@ -230,12 +235,11 @@ struct ContentView: View {
         statusMessage = isRunning ? "运行中" : "空闲"
     }
 
-    private func autoStartIfNeeded() {
-        guard config.autoStart, !isRunning else { return }
-        // Small delay to ensure UI is ready before auto-starting
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            self.startProxy()
-        }
+    private func presentAutoStartErrorIfNeeded() {
+        guard let message = notices.autoStartError, !message.isEmpty else { return }
+        notices.autoStartError = nil
+        errorMessage = "自动启动失败：\(message)"
+        showError = true
     }
 }
 
